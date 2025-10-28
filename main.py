@@ -6,6 +6,7 @@ import sys
 from aiogram import Bot, Dispatcher
 from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
+from aiogram.fsm.storage.memory import MemoryStorage
 
 from config.logging_config import setup_logging
 from config.settings import settings
@@ -13,6 +14,7 @@ from database.database import init_database, close_database
 from services.openai_service import init_openai, test_openai_connection
 from services.ocr_service import init_ocr_client, test_ocr_connection, close_ocr_client
 from services.health_server import start_health_server, stop_health_server
+from handlers.vocabulary_handler import router as vocabulary_router
 from handlers.message_handler import router as message_router
 
 logger = logging.getLogger(__name__)
@@ -77,16 +79,17 @@ async def main() -> None:
     # Perform startup checks
     await startup_checks()
 
-    # Initialize bot and dispatcher
+    # Initialize bot and dispatcher with FSM storage
     bot = Bot(
         token=settings.telegram_bot_token,
         default=DefaultBotProperties(parse_mode=ParseMode.HTML)
     )
 
-    dp = Dispatcher()
+    dp = Dispatcher(storage=MemoryStorage())
 
-    # Register routers
-    dp.include_router(message_router)
+    # Register routers (order matters - more specific first!)
+    dp.include_router(vocabulary_router)  # Specific commands: /addword, /mywords, /quiz
+    dp.include_router(message_router)     # Generic handlers: /start, /help, catch-all
 
     try:
         logger.info("✓ Telegram bot authorized successfully")

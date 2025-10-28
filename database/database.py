@@ -43,11 +43,30 @@ async def init_database() -> None:
         async with engine.begin() as conn:
             await conn.execute(text("SELECT 1"))
 
+        # Create tables
+        await create_tables()
+
         logger.info("✓ Database connection successful")
 
     except Exception as e:
         logger.error(f"✗ Database connection failed: {e}")
         raise
+
+
+async def create_tables() -> None:
+    """Create all database tables."""
+    global engine
+
+    if engine is None:
+        raise RuntimeError("Database engine not initialized")
+
+    # Import models to register them with Base
+    from database.models import User, Word
+
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+
+    logger.info("✓ Database tables created/verified")
 
 
 async def close_database() -> None:
