@@ -5,7 +5,7 @@ from aiogram import Router, types, F
 from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
 
-from database.database import async_session_maker
+from database.database import get_session_maker
 from handlers.states import AddWordStates, QuizStates
 from services.vocabulary_service import VocabularyService
 
@@ -77,47 +77,48 @@ async def process_translation(message: types.Message, state: FSMContext) -> None
 
     try:
         # Get session and service
-        async with async_session_maker() as session:
+        session_maker = get_session_maker()
+        async with session_maker() as session:
             vocab_service = get_vocabulary_service(session)
 
             # Get or create user
             user = await vocab_service.get_or_create_user(
-            telegram_id=message.from_user.id,
-            username=message.from_user.username,
-            first_name=message.from_user.first_name,
-            last_name=message.from_user.last_name
-        )
+                telegram_id=message.from_user.id,
+                username=message.from_user.username,
+                first_name=message.from_user.first_name,
+                last_name=message.from_user.last_name
+            )
 
-        # Add word with validation
-        word, validation = await vocab_service.add_word_with_validation(
-            user=user,
-            german_word=german_word,
-            translation=translation
-        )
+            # Add word with validation
+            word, validation = await vocab_service.add_word_with_validation(
+                user=user,
+                german_word=german_word,
+                translation=translation
+            )
 
-        # Delete processing message
-        await processing_msg.delete()
+            # Delete processing message
+            await processing_msg.delete()
 
-        # Prepare response
-        if validation.is_correct:
-            response = f"✅ <b>Correct!</b>\n\n"
-        else:
-            response = f"⚠️ <b>Not quite right</b>\n\n"
+            # Prepare response
+            if validation.is_correct:
+                response = f"✅ <b>Correct!</b>\n\n"
+            else:
+                response = f"⚠️ <b>Not quite right</b>\n\n"
 
-        response += f"📖 <b>{word.full_german_word}</b> = {translation}\n\n"
-        response += f"💬 {validation.feedback}\n\n"
-        response += f"✨ Word saved to your vocabulary!"
+            response += f"📖 <b>{word.full_german_word}</b> = {translation}\n\n"
+            response += f"💬 {validation.feedback}\n\n"
+            response += f"✨ Word saved to your vocabulary!"
 
-        # Show word count
-        word_count = await vocab_service.get_word_count(user)
-        response += f"\n📊 Total words: {word_count}"
+            # Show word count
+            word_count = await vocab_service.get_word_count(user)
+            response += f"\n📊 Total words: {word_count}"
 
-        await message.answer(response, parse_mode="HTML")
+            await message.answer(response, parse_mode="HTML")
 
-        # Clear state
-        await state.clear()
+            # Clear state
+            await state.clear()
 
-        logger.info(f"User {message.from_user.id} added word: {word.full_german_word}")
+            logger.info(f"User {message.from_user.id} added word: {word.full_german_word}")
 
     except Exception as e:
         logger.error(f"Error adding word: {e}")
@@ -138,7 +139,8 @@ async def cmd_mywords(message: types.Message) -> None:
     logger.info(f"User {message.from_user.id} requested /mywords")
 
     try:
-        async with async_session_maker() as session:
+        session_maker = get_session_maker()
+        async with session_maker() as session:
             vocab_service = get_vocabulary_service(session)
 
             # Get or create user
@@ -197,7 +199,8 @@ async def cmd_quiz(message: types.Message, state: FSMContext) -> None:
     logger.info(f"User {message.from_user.id} started /quiz")
 
     try:
-        async with async_session_maker() as session:
+        session_maker = get_session_maker()
+        async with session_maker() as session:
             vocab_service = get_vocabulary_service(session)
 
             # Get or create user
@@ -253,7 +256,8 @@ async def process_quiz_answer(message: types.Message, state: FSMContext) -> None
         data = await state.get_data()
         word_id = data.get("word_id")
 
-        async with async_session_maker() as session:
+        session_maker = get_session_maker()
+        async with session_maker() as session:
             vocab_service = get_vocabulary_service(session)
 
             # Get word

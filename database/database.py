@@ -78,8 +78,15 @@ async def close_database() -> None:
         logger.info("Database connection closed")
 
 
+def get_session_maker():
+    """Get the session maker (for use in handlers)."""
+    if async_session_maker is None:
+        raise RuntimeError("Database not initialized. Call init_database() first.")
+    return async_session_maker
+
+
 async def get_session() -> AsyncSession:
-    """Get database session."""
+    """Get database session (deprecated - use get_session_maker instead)."""
     if async_session_maker is None:
         raise RuntimeError("Database not initialized")
 
