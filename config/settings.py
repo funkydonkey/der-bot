@@ -22,11 +22,11 @@ class Settings(BaseSettings):
     # OpenAI
     openai_api_key: str
 
-    # MCP OCR Server
-    mcp_ocr_endpoint: str
+    # MCP OCR Server (optional)
+    mcp_ocr_endpoint: str = "https://mcp-ocr.example.com"
 
-    # Database
-    database_url: str
+    # Database (defaults to SQLite for local dev, override for production)
+    database_url: str = "sqlite+aiosqlite:///./telegram_bot.db"
 
 
 # Global settings instance
