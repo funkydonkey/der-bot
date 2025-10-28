@@ -12,6 +12,7 @@ from config.settings import settings
 from database.database import init_database, close_database
 from services.openai_service import init_openai, test_openai_connection
 from services.ocr_service import init_ocr_client, test_ocr_connection, close_ocr_client
+from services.health_server import start_health_server, stop_health_server
 from handlers.message_handler import router as message_router
 
 logger = logging.getLogger(__name__)
@@ -61,6 +62,7 @@ async def shutdown(dispatcher: Dispatcher, bot: Bot) -> None:
     # Close all connections
     await close_database()
     await close_ocr_client()
+    await stop_health_server()
     await bot.session.close()
     await dispatcher.storage.close()
 
@@ -88,6 +90,10 @@ async def main() -> None:
 
     try:
         logger.info("✓ Telegram bot authorized successfully")
+
+        # Start health check server (for Render.com port binding)
+        await start_health_server(port=settings.port)
+
         logger.info("Bot is starting polling...")
 
         # Start polling

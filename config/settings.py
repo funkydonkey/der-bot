@@ -15,6 +15,7 @@ class Settings(BaseSettings):
     # Application
     app_env: str = "development"
     log_level: str = "INFO"
+    port: int = 10000  # Port for health check server (Render uses 10000 by default)
 
     # Telegram
     telegram_bot_token: str

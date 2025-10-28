@@ -11,6 +11,8 @@ services:
         value: production
       - key: LOG_LEVEL
         value: INFO
+      - key: PORT
+        value: 10000
       - key: TELEGRAM_BOT_TOKEN
         sync: false  # Set in Render dashboard
       - key: OPENAI_API_KEY
