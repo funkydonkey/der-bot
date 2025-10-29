@@ -138,6 +138,34 @@ class WordRepository:
             await self.session.commit()
             logger.info(f"Deleted word {word_id}")
 
+    async def delete_word_by_text(self, user_id: int, german_word: str) -> bool:
+        """Delete a word by German word text (case-insensitive)."""
+        # Normalize the input - remove article if present
+        normalized = german_word.strip().lower()
+        for article in ["der ", "die ", "das "]:
+            if normalized.startswith(article):
+                normalized = normalized[len(article):]
+                break
+
+        # Find the word
+        query = select(Word).where(
+            Word.user_id == user_id,
+            Word.status == "active"
+        )
+        result = await self.session.execute(query)
+        words = list(result.scalars().all())
+
+        # Find matching word (case-insensitive, with or without article)
+        for word in words:
+            word_text = word.german_word.lower()
+            if word_text == normalized:
+                word.status = "deleted"
+                await self.session.commit()
+                logger.info(f"Deleted word {word.id} ({word.full_german_word}) for user {user_id}")
+                return True
+
+        return False
+
     async def search_words(
         self,
         user_id: int,

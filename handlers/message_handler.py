@@ -22,6 +22,7 @@ async def cmd_start(message: types.Message) -> None:
         f"📝 /addword - Add a new German word\n"
         f"📚 /mywords - View your vocabulary\n"
         f"🎯 /quiz - Practice with a quiz\n"
+        f"🗑️ /delete - Remove a word\n"
         f"ℹ️ /help - Show this help message\n\n"
         f"<i>Get started by adding your first word with /addword!</i>"
     )
@@ -37,11 +38,15 @@ async def cmd_help(message: types.Message) -> None:
         "<b>Commands:</b>\n\n"
         "📝 <b>/addword</b>\n"
         "   Add a new German word to your vocabulary\n"
-        "   Example: I'll ask for the German word and translation\n\n"
+        "   Only the German word is needed - learn translation through quiz!\n\n"
         "📚 <b>/mywords</b>\n"
         "   View all your saved words with statistics\n\n"
         "🎯 <b>/quiz</b>\n"
-        "   Practice with a random word from your vocabulary\n\n"
+        "   Practice with a random word from your vocabulary\n"
+        "   First attempt will save the correct translation\n\n"
+        "🗑️ <b>/delete</b> <i>&lt;word&gt;</i>\n"
+        "   Remove a word from your vocabulary\n"
+        "   Example: /delete hund or /delete der Hund\n\n"
         "<b>Features:</b>\n"
         "✨ Automatic article detection (der/die/das)\n"
         "🤖 AI-powered translation validation\n"
@@ -67,6 +72,7 @@ async def handle_any_message(message: types.Message) -> None:
         "/addword - Add a new word\n"
         "/mywords - View your vocabulary\n"
         "/quiz - Practice your words\n"
+        "/delete - Remove a word\n"
         "/help - Get help"
     )
 

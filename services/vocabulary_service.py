@@ -179,3 +179,7 @@ class VocabularyService:
     async def delete_word(self, word_id: int) -> None:
         """Delete a word."""
         await self.word_repo.delete_word(word_id)
+
+    async def delete_word_by_text(self, user: User, german_word: str) -> bool:
+        """Delete a word by German word text."""
+        return await self.word_repo.delete_word_by_text(user.id, german_word)

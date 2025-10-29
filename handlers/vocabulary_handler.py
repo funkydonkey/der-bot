@@ -105,6 +105,71 @@ async def process_german_word(message: types.Message, state: FSMContext) -> None
 
 
 # ============================================================================
+# /delete command - Delete a word from vocabulary
+# ============================================================================
+
+@router.message(Command("delete"))
+async def cmd_delete(message: types.Message) -> None:
+    """Delete a word from vocabulary."""
+    logger.info(f"User {message.from_user.id} requested /delete")
+
+    # Extract the word from the command
+    # Format: /delete hund  or  /delete der Hund
+    command_parts = message.text.split(maxsplit=1)
+
+    if len(command_parts) < 2:
+        await message.answer(
+            "❌ Please specify a word to delete.\n\n"
+            "Usage: /delete <word>\n"
+            "Examples:\n"
+            "• /delete hund\n"
+            "• /delete der Hund\n"
+            "• /delete Tisch"
+        )
+        return
+
+    german_word = command_parts[1].strip()
+
+    try:
+        session_maker = get_session_maker()
+        async with session_maker() as session:
+            vocab_service = get_vocabulary_service(session)
+
+            # Get or create user
+            user = await vocab_service.get_or_create_user(
+                telegram_id=message.from_user.id,
+                username=message.from_user.username,
+                first_name=message.from_user.first_name,
+                last_name=message.from_user.last_name
+            )
+
+            # Delete the word
+            deleted = await vocab_service.delete_word_by_text(user, german_word)
+
+            if deleted:
+                # Show success message
+                word_count = await vocab_service.get_word_count(user)
+                await message.answer(
+                    f"✅ <b>Deleted!</b>\n\n"
+                    f"Removed '<b>{german_word}</b>' from your vocabulary.\n\n"
+                    f"📊 Words remaining: {word_count}",
+                    parse_mode="HTML"
+                )
+                logger.info(f"User {message.from_user.id} deleted word: {german_word}")
+            else:
+                await message.answer(
+                    f"❌ <b>Word not found</b>\n\n"
+                    f"Could not find '<b>{german_word}</b>' in your vocabulary.\n\n"
+                    f"💡 Tip: Use /mywords to see your vocabulary list.",
+                    parse_mode="HTML"
+                )
+
+    except Exception as e:
+        logger.error(f"Error deleting word: {e}")
+        await message.answer("❌ Sorry, couldn't delete the word. Please try again.")
+
+
+# ============================================================================
 # /mywords command - List user's vocabulary
 # ============================================================================
 
