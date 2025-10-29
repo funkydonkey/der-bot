@@ -1,11 +1,11 @@
 """Word repository for database operations."""
 import logging
+import random
 from datetime import datetime
 from typing import Optional, List
 
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.sql.expression import func as sql_func
 
 from database.models import Word
 
@@ -66,14 +66,13 @@ class WordRepository:
         return list(result.scalars().all())
 
     async def get_random_word(self, user_id: int, status: str = "active") -> Optional[Word]:
-        """Get a random word for quiz using database-level randomization."""
-        query = select(Word).where(
-            Word.user_id == user_id,
-            Word.status == status
-        ).order_by(sql_func.random()).limit(1)
+        """Get a random word for quiz using Python's random for better distribution."""
+        # Get all words for the user
+        words = await self.get_user_words(user_id, status)
 
-        result = await self.session.execute(query)
-        return result.scalar_one_or_none()
+        # Use Python's random.choice() for proper randomization
+        # This provides much better distribution than SQL random() for small datasets
+        return random.choice(words) if words else None
 
     async def count_user_words(self, user_id: int, status: str = "active") -> int:
         """Count total words for a user."""
