@@ -149,9 +149,11 @@ class VocabularyService:
         # If translation is pending, save the correct translation from LLM
         if word.translation == "[pending]":
             logger.info(f"First quiz attempt for word {word.id}, saving translation")
+            # Use the correct translation from LLM, not the user's answer
+            correct_translation = validation.correct_translation or user_answer
             await self.word_repo.update_translation(
                 word_id=word.id,
-                translation=user_answer,  # Save user's answer
+                translation=correct_translation,
                 validated_by_agent=True,
                 validation_feedback=validation.feedback
             )

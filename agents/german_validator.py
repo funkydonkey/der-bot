@@ -16,6 +16,7 @@ class ValidationResult:
     """Result of translation validation."""
     is_correct: bool
     feedback: str
+    correct_translation: Optional[str] = None  # The correct English translation
     corrected_german: Optional[str] = None  # With article if missing
     article: Optional[str] = None  # der, die, das
 
@@ -34,25 +35,26 @@ Your tasks:
 Return a JSON object with these fields:
 - "is_correct": true if translation is correct (or close enough), false otherwise
 - "feedback": A friendly message explaining the result
+- "correct_translation": The correct English translation of the German word
 - "article": The correct article (der/die/das) if applicable, null otherwise
 - "corrected_german": The German word with article if it was missing, null otherwise
 
 **Examples**:
 
 Input: german_word="Katze", user_translation="cat"
-Output: {"is_correct": true, "feedback": "Correct! However, the full form is 'die Katze'.", "article": "die", "corrected_german": "die Katze"}
+Output: {"is_correct": true, "feedback": "Correct! However, the full form is 'die Katze'.", "correct_translation": "cat", "article": "die", "corrected_german": "die Katze"}
 
 Input: german_word="der Hund", user_translation="dog"
-Output: {"is_correct": true, "feedback": "Perfect! 'Der Hund' means 'dog'.", "article": "der", "corrected_german": null}
+Output: {"is_correct": true, "feedback": "Perfect! 'Der Hund' means 'dog'.", "correct_translation": "dog", "article": "der", "corrected_german": null}
 
 Input: german_word="Hund", user_translation="hound"
-Output: {"is_correct": false, "feedback": "Almost! 'Der Hund' means 'dog', not 'hound'. They're related but not exact matches.", "article": "der", "corrected_german": "der Hund"}
+Output: {"is_correct": false, "feedback": "Almost! 'Der Hund' means 'dog', not 'hound'. They're related but not exact matches.", "correct_translation": "dog", "article": "der", "corrected_german": "der Hund"}
 
 Input: german_word="Tisch", user_translation="fish"
-Output: {"is_correct": false, "feedback": "Not quite! 'Der Tisch' means 'table', not 'fish'.", "article": "der", "corrected_german": "der Tisch"}
+Output: {"is_correct": false, "feedback": "Not quite! 'Der Tisch' means 'table', not 'fish'.", "correct_translation": "table", "article": "der", "corrected_german": "der Tisch"}
 
 Input: german_word="schnell", user_translation="fast"
-Output: {"is_correct": true, "feedback": "Correct! 'Schnell' means 'fast'.", "article": null, "corrected_german": null}
+Output: {"is_correct": true, "feedback": "Correct! 'Schnell' means 'fast'.", "correct_translation": "fast", "article": null, "corrected_german": null}
 
 **Rules**:
 - Always be encouraging and supportive
@@ -118,6 +120,7 @@ Validate the translation and provide feedback. If the German word is a noun with
             return ValidationResult(
                 is_correct=result.get("is_correct", False),
                 feedback=result.get("feedback", "Unable to validate"),
+                correct_translation=result.get("correct_translation"),
                 corrected_german=result.get("corrected_german"),
                 article=result.get("article")
             )
