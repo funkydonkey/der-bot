@@ -2,7 +2,7 @@
 from datetime import datetime
 from typing import Optional
 
-from sqlalchemy import BigInteger, String, Integer, DateTime, Text, Boolean
+from sqlalchemy import BigInteger, String, Integer, DateTime, Text, Boolean, ForeignKey
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from database.database import Base
@@ -35,7 +35,7 @@ class Word(Base):
     __tablename__ = "words"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    user_id: Mapped[int] = mapped_column(Integer, nullable=False, index=True)
+    user_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id"), nullable=False, index=True)
     german_word: Mapped[str] = mapped_column(String(255), nullable=False)
     article: Mapped[Optional[str]] = mapped_column(String(10), nullable=True)  # der, die, das
     translation: Mapped[str] = mapped_column(String(255), nullable=False)
