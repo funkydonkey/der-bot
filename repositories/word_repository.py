@@ -80,6 +80,28 @@ class WordRepository:
         )
         return result.scalar() or 0
 
+    async def update_translation(
+        self,
+        word_id: int,
+        translation: str,
+        validated_by_agent: bool = True,
+        validation_feedback: Optional[str] = None
+    ) -> Word:
+        """Update word translation (for lazy loading)."""
+        word = await self.get_by_id(word_id)
+        if not word:
+            raise ValueError(f"Word {word_id} not found")
+
+        word.translation = translation
+        word.validated_by_agent = validated_by_agent
+        word.validation_feedback = validation_feedback
+
+        await self.session.commit()
+        await self.session.refresh(word)
+
+        logger.info(f"Updated translation for word {word_id}: {translation}")
+        return word
+
     async def update_review_stats(
         self,
         word_id: int,

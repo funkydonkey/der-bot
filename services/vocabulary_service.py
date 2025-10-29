@@ -79,6 +79,43 @@ class VocabularyService:
 
         return word, validation
 
+    async def add_word_without_translation(
+        self,
+        user: User,
+        german_word: str
+    ) -> tuple[Word, dict]:
+        """
+        Add a new word without translation (lazy loading).
+        Translation will be filled in during first quiz attempt.
+
+        Args:
+            user: User object
+            german_word: German word (with or without article)
+
+        Returns:
+            Tuple of (Word, article_info dict)
+        """
+        # Check and add article if needed
+        article_info = await german_validator.check_article(german_word)
+
+        article = article_info.get("article")
+        word_without_article = article_info.get("word")
+        full_german_word = article_info.get("full_word")
+
+        logger.info(f"Article check: {german_word} → {full_german_word} (article: {article})")
+
+        # Save to database with placeholder translation
+        word = await self.word_repo.create(
+            user_id=user.id,
+            german_word=word_without_article,
+            article=article,
+            translation="[pending]",  # Placeholder until first quiz
+            validated_by_agent=False,
+            validation_feedback=None
+        )
+
+        return word, article_info
+
     async def get_user_words(self, user: User, limit: Optional[int] = None) -> List[Word]:
         """Get all words for a user."""
         return await self.word_repo.get_user_words(user.id, limit=limit)
@@ -94,6 +131,7 @@ class VocabularyService:
     ) -> ValidationResult:
         """
         Validate quiz answer.
+        If translation is pending, get correct translation from LLM and save it.
 
         Args:
             word: Word object
@@ -107,6 +145,18 @@ class VocabularyService:
             word.full_german_word,
             user_answer
         )
+
+        # If translation is pending, save the correct translation from LLM
+        if word.translation == "[pending]":
+            logger.info(f"First quiz attempt for word {word.id}, saving translation")
+            await self.word_repo.update_translation(
+                word_id=word.id,
+                translation=user_answer,  # Save user's answer
+                validated_by_agent=True,
+                validation_feedback=validation.feedback
+            )
+            # Refresh word object with new translation
+            await self.session.refresh(word)
 
         # Update statistics
         await self.word_repo.update_review_stats(

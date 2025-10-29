@@ -6,7 +6,21 @@ Stage 2 has been successfully implemented with OpenAI Agent validation and compr
 
 ## 🎯 Features Implemented
 
-### 1. Database Models
+### 1. Lazy Translation Loading (NEW - Oct 29, 2025)
+**Objective**: Simplify word addition and learn translations through practice
+
+**How it works:**
+1. User adds German word using `/addword` (no translation required)
+2. Bot checks article (der/die/das) and saves word with `[pending]` translation
+3. During first `/quiz` attempt, LLM validates answer and saves the translation
+4. Subsequent quizzes use the stored translation
+
+**Benefits:**
+- Faster word addition (1 step instead of 2)
+- Natural learning flow: add word → practice → learn translation
+- Still leverages OpenAI validation for accuracy
+
+### 2. Database Models
 **Files**: `database/models.py`
 
 - **User Model**: Stores Telegram user information
@@ -124,24 +138,27 @@ der-bot/
 
 ## 🎮 User Flow Examples
 
-### Adding a Word
+### Adding a Word (NEW - Simplified Flow)
 
 ```
 User: /addword
 Bot: 📝 Let's add a new German word!
      Enter the German word (with or without article):
-     💡 Tip: If you don't include the article, I'll add it for you!
+     Examples: 'Hund' or 'der Hund'
+
+     💡 Tips:
+     • If you don't include the article (der/die/das), I'll add it for you!
+     • You'll learn the translation during your first quiz!
 
 User: Hund
-Bot: ✅ Got it: Hund
-     Now enter the English translation:
+Bot: 🤔 Checking the article...
+     ✨ Word added!
 
-User: dog
-Bot: 🤔 Checking your translation...
-     ✅ Correct!
-     📖 der Hund = dog
-     💬 Perfect! However, the full form is "der Hund".
-     ✨ Word saved to your vocabulary!
+     📖 der Hund
+
+     💡 Article: der
+
+     🎯 Use /quiz to learn the translation!
      📊 Total words: 1
 ```
 
@@ -151,14 +168,41 @@ Bot: 🤔 Checking your translation...
 User: /mywords
 Bot: 📚 Your Vocabulary (3 words)
 
-     1. der Hund = dog [2✓/0✗]
+     1. der Hund = ❓ Practice to learn!
      2. die Katze = cat [1✓/1✗]
      3. der Tisch = table [0✓/2✗]
 
      💡 Ready to practice? Use /quiz to test yourself!
 ```
 
-### Taking a Quiz
+### Taking a Quiz (First Time - Learning Translation)
+
+```
+User: /quiz
+Bot: 🎯 Quiz Time!
+     Translate this German word to English:
+
+     der Hund
+
+     Your answer:
+
+User: dog
+Bot: 🤔 Checking your answer...
+     ✅ Correct!
+
+     🎉 First attempt at this word!
+
+     📖 der Hund = dog
+     💬 Perfect translation!
+
+     📊 Your stats for this word:
+        Correct: 1 | Incorrect: 0
+        Success rate: 100%
+
+     Want to practice more? Use /quiz again!
+```
+
+### Taking a Quiz (Subsequent Attempts)
 
 ```
 User: /quiz
@@ -256,9 +300,29 @@ Tests cover:
 5. Quiz flow
 6. Statistics tracking
 
-## ✅ Recent Fixes (2025-10-28)
+## ✅ Recent Updates
 
-### Session Management Fixed
+### Lazy Translation Loading (2025-10-29)
+**NEW FEATURE**: Simplified word addition with lazy translation loading
+
+**Changes made:**
+1. **FSM States**: Removed `waiting_for_translation` state from `AddWordStates`
+2. **Vocabulary Service**:
+   - Added `add_word_without_translation()` method
+   - Modified `validate_quiz_answer()` to save translation on first attempt
+3. **Word Repository**: Added `update_translation()` method for lazy updates
+4. **Handlers**:
+   - `/addword` now only asks for German word, saves with `[pending]` translation
+   - `/mywords` displays pending translations as "❓ Practice to learn!"
+   - Quiz shows "🎉 First attempt at this word!" message when learning translation
+
+**Benefits:**
+- ✨ Faster word addition (1 step vs 2 steps)
+- 🎯 More natural learning flow
+- 🤖 Still uses OpenAI validation for accuracy
+- 📊 No database schema changes required
+
+### Session Management Fixed (2025-10-28)
 All vocabulary handlers now properly use database session context:
 ```python
 async with async_session_maker() as session:

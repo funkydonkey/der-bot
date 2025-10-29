@@ -34,46 +34,23 @@ async def cmd_addword(message: types.Message, state: FSMContext) -> None:
         "📝 Let's add a new German word!\n\n"
         "Enter the German word (with or without article):\n"
         "Examples: 'Hund' or 'der Hund'\n\n"
-        "💡 Tip: If you don't include the article (der/die/das), "
-        "I'll add it for you!"
+        "💡 Tips:\n"
+        "• If you don't include the article (der/die/das), I'll add it for you!\n"
+        "• You'll learn the translation during your first quiz!"
     )
 
 
 @router.message(AddWordStates.waiting_for_german)
 async def process_german_word(message: types.Message, state: FSMContext) -> None:
-    """Process the German word input."""
+    """Process the German word input and save without translation."""
     german_word = message.text.strip()
 
     if not german_word:
         await message.answer("Please enter a valid German word.")
         return
 
-    # Save German word to state
-    await state.update_data(german_word=german_word)
-    await state.set_state(AddWordStates.waiting_for_translation)
-
-    await message.answer(
-        f"✅ Got it: <b>{german_word}</b>\n\n"
-        f"Now enter the English translation:",
-        parse_mode="HTML"
-    )
-
-
-@router.message(AddWordStates.waiting_for_translation)
-async def process_translation(message: types.Message, state: FSMContext) -> None:
-    """Process the translation and validate with agent."""
-    translation = message.text.strip()
-
-    if not translation:
-        await message.answer("Please enter a valid translation.")
-        return
-
-    # Get saved data
-    data = await state.get_data()
-    german_word = data.get("german_word")
-
     # Show processing message
-    processing_msg = await message.answer("🤔 Checking your translation...")
+    processing_msg = await message.answer("🤔 Checking the article...")
 
     try:
         # Get session and service
@@ -89,29 +66,27 @@ async def process_translation(message: types.Message, state: FSMContext) -> None
                 last_name=message.from_user.last_name
             )
 
-            # Add word with validation
-            word, validation = await vocab_service.add_word_with_validation(
+            # Add word without translation
+            word, article_info = await vocab_service.add_word_without_translation(
                 user=user,
-                german_word=german_word,
-                translation=translation
+                german_word=german_word
             )
 
             # Delete processing message
             await processing_msg.delete()
 
             # Prepare response
-            if validation.is_correct:
-                response = f"✅ <b>Correct!</b>\n\n"
-            else:
-                response = f"⚠️ <b>Not quite right</b>\n\n"
+            response = f"✨ <b>Word added!</b>\n\n"
+            response += f"📖 <b>{word.full_german_word}</b>\n\n"
 
-            response += f"📖 <b>{word.full_german_word}</b> = {translation}\n\n"
-            response += f"💬 {validation.feedback}\n\n"
-            response += f"✨ Word saved to your vocabulary!"
+            if article_info.get("article"):
+                response += f"💡 Article: {article_info.get('article')}\n"
+
+            response += f"\n🎯 Use /quiz to learn the translation!\n"
 
             # Show word count
             word_count = await vocab_service.get_word_count(user)
-            response += f"\n📊 Total words: {word_count}"
+            response += f"📊 Total words: {word_count}"
 
             await message.answer(response, parse_mode="HTML")
 
@@ -168,7 +143,10 @@ async def cmd_mywords(message: types.Message) -> None:
                 success_rate = word.success_rate
                 stats = f" [{word.correct_count}✓/{word.incorrect_count}✗]" if word.total_reviews > 0 else ""
 
-                response += f"{i}. <b>{word.full_german_word}</b> = {word.translation}{stats}\n"
+                # Show pending translations differently
+                translation_display = word.translation if word.translation != "[pending]" else "❓ <i>Practice to learn!</i>"
+
+                response += f"{i}. <b>{word.full_german_word}</b> = {translation_display}{stats}\n"
 
                 # Split into multiple messages if too long
                 if len(response) > 3500:
@@ -268,7 +246,10 @@ async def process_quiz_answer(message: types.Message, state: FSMContext) -> None
                 await state.clear()
                 return
 
-            # Validate answer
+            # Check if this is first quiz (translation pending)
+            is_first_quiz = word.translation == "[pending]"
+
+            # Validate answer (this will also save translation if pending)
             validation = await vocab_service.validate_quiz_answer(word, user_answer)
 
             # Delete processing message
@@ -283,6 +264,11 @@ async def process_quiz_answer(message: types.Message, state: FSMContext) -> None
                 title = "<b>Not quite!</b>"
 
             response = f"{emoji} {title}\n\n"
+
+            # Special message for first quiz
+            if is_first_quiz:
+                response += f"🎉 <b>First attempt at this word!</b>\n\n"
+
             response += f"📖 <b>{word.full_german_word}</b> = {word.translation}\n\n"
             response += f"💬 {validation.feedback}\n\n"
 
