@@ -17,3 +17,9 @@ class ImageOCRStates(StatesGroup):
     waiting_for_image = State()
     reviewing_words = State()
     editing_word = State()
+
+
+class BulkAddStates(StatesGroup):
+    """States for bulk adding words from pasted text."""
+    waiting_for_text = State()
+    reviewing_words = State()
