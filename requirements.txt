@@ -12,6 +12,9 @@ openai==1.57.2
 # MCP Client
 httpx==0.28.1
 
+# Image Processing for OCR
+Pillow==11.0.0
+
 # Environment variables
 python-dotenv==1.0.1
 

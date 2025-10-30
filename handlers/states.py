@@ -10,3 +10,10 @@ class AddWordStates(StatesGroup):
 class QuizStates(StatesGroup):
     """States for quiz mode."""
     waiting_for_answer = State()
+
+
+class ImageOCRStates(StatesGroup):
+    """States for adding words via image OCR."""
+    waiting_for_image = State()
+    reviewing_words = State()
+    editing_word = State()

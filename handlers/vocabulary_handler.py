@@ -4,10 +4,12 @@ import logging
 from aiogram import Router, types, F
 from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
+from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, CallbackQuery
 
 from database.database import get_session_maker
-from handlers.states import AddWordStates, QuizStates
+from handlers.states import AddWordStates, QuizStates, ImageOCRStates
 from services.vocabulary_service import VocabularyService
+from services.ocr_service import extract_german_words
 
 logger = logging.getLogger(__name__)
 
@@ -359,4 +361,217 @@ async def process_quiz_answer(message: types.Message, state: FSMContext) -> None
         logger.error(f"Error processing quiz answer: {e}")
         await processing_msg.delete()
         await message.answer("❌ Sorry, couldn't check your answer.")
+        await state.clear()
+
+
+# ============================================================================
+# /addphoto command & Image OCR - Add words from photos
+# ============================================================================
+
+@router.message(Command("addphoto"))
+async def cmd_addphoto(message: types.Message, state: FSMContext) -> None:
+    """Start the add words from photo flow."""
+    logger.info(f"User {message.from_user.id} started /addphoto")
+
+    await state.set_state(ImageOCRStates.waiting_for_image)
+    await message.answer(
+        "📸 <b>Add Words from Photo</b>\n\n"
+        "Send me a photo or document containing German words!\n\n"
+        "💡 <b>Tips for best results:</b>\n"
+        "• Clear, well-lit images work best\n"
+        "• Avoid blurry or low-resolution photos\n"
+        "• Printed text works better than handwriting\n\n"
+        "I'll extract the German words and let you review them before saving.",
+        parse_mode="HTML"
+    )
+
+
+@router.message(ImageOCRStates.waiting_for_image, F.photo | F.document)
+async def process_image_upload(message: types.Message, state: FSMContext) -> None:
+    """Process uploaded image and extract German words."""
+    logger.info(f"User {message.from_user.id} uploaded image for OCR")
+
+    # Show processing message
+    processing_msg = await message.answer("🔍 Processing image and extracting words...")
+
+    try:
+        # Get the file
+        if message.photo:
+            # Get largest photo size
+            photo = message.photo[-1]
+            file = await message.bot.get_file(photo.file_id)
+        elif message.document:
+            file = await message.bot.get_file(message.document.file_id)
+        else:
+            await processing_msg.delete()
+            await message.answer("❌ Please send a photo or document.")
+            return
+
+        # Download file
+        image_data = await message.bot.download_file(file.file_path)
+        image_bytes = image_data.read()
+
+        # Extract German words using OCR
+        words, confidences = await extract_german_words(image_bytes)
+
+        # Delete processing message
+        await processing_msg.delete()
+
+        if not words:
+            await message.answer(
+                "❌ <b>No words found</b>\n\n"
+                "I couldn't extract any German words from this image.\n\n"
+                "💡 Try:\n"
+                "• A clearer or higher-resolution image\n"
+                "• Better lighting\n"
+                "• Making sure the text is visible and in focus",
+                parse_mode="HTML"
+            )
+            await state.clear()
+            return
+
+        # Save words to state for review
+        await state.update_data(
+            extracted_words=words,
+            confidences=confidences
+        )
+        await state.set_state(ImageOCRStates.reviewing_words)
+
+        # Show extracted words for review
+        response = f"✨ <b>Found {len(words)} words!</b>\n\n"
+        response += "📝 <b>Extracted words:</b>\n"
+
+        for i, word in enumerate(words, 1):
+            response += f"{i}. {word}\n"
+
+        response += "\n💡 <b>What would you like to do?</b>\n"
+        response += "• Type <b>'OK'</b> or <b>'Save'</b> to add all words\n"
+        response += "• Type <b>'Remove 3,5,7'</b> to skip certain words\n"
+        response += "• Type <b>'Cancel'</b> to discard everything"
+
+        await message.answer(response, parse_mode="HTML")
+
+        logger.info(f"User {message.from_user.id} reviewing {len(words)} extracted words")
+
+    except Exception as e:
+        logger.error(f"Error processing image: {e}")
+        await processing_msg.delete()
+        await message.answer(
+            "❌ Sorry, something went wrong while processing the image.\n\n"
+            "Please try again with a different photo."
+        )
+        await state.clear()
+
+
+@router.message(ImageOCRStates.reviewing_words)
+async def process_word_review(message: types.Message, state: FSMContext) -> None:
+    """Process user's review/correction of extracted words."""
+    user_input = message.text.strip().lower()
+
+    if not user_input:
+        await message.answer("Please provide a response.")
+        return
+
+    try:
+        # Get saved data
+        data = await state.get_data()
+        words = data.get("extracted_words", [])
+
+        if not words:
+            await message.answer("❌ No words to process.")
+            await state.clear()
+            return
+
+        # Handle different commands
+        if user_input in ["cancel", "abort", "stop"]:
+            await message.answer("❌ Cancelled. No words were added.")
+            await state.clear()
+            return
+
+        elif user_input in ["ok", "save", "yes", "confirm"]:
+            # Save all words
+            final_words = words
+
+        elif user_input.startswith("remove "):
+            # Parse indices to remove
+            try:
+                indices_str = user_input.replace("remove ", "").strip()
+                indices = [int(i.strip()) - 1 for i in indices_str.split(",")]
+
+                # Validate indices
+                indices = [i for i in indices if 0 <= i < len(words)]
+
+                # Remove selected words
+                final_words = [w for i, w in enumerate(words) if i not in indices]
+
+                if not final_words:
+                    await message.answer("❌ All words removed. Nothing to save.")
+                    await state.clear()
+                    return
+
+            except ValueError:
+                await message.answer(
+                    "❌ Invalid format. Use: <b>Remove 1,3,5</b>",
+                    parse_mode="HTML"
+                )
+                return
+
+        else:
+            await message.answer(
+                "❌ Invalid command.\n\n"
+                "Use:\n"
+                "• <b>'OK'</b> to save all words\n"
+                "• <b>'Remove 1,3,5'</b> to skip specific words\n"
+                "• <b>'Cancel'</b> to discard",
+                parse_mode="HTML"
+            )
+            return
+
+        # Save words to database
+        processing_msg = await message.answer("💾 Saving words...")
+
+        session_maker = get_session_maker()
+        async with session_maker() as session:
+            vocab_service = get_vocabulary_service(session)
+
+            # Get or create user
+            user = await vocab_service.get_or_create_user(
+                telegram_id=message.from_user.id,
+                username=message.from_user.username,
+                first_name=message.from_user.first_name,
+                last_name=message.from_user.last_name
+            )
+
+            # Add each word
+            saved_count = 0
+            for word in final_words:
+                try:
+                    await vocab_service.add_word_without_translation(user, word)
+                    saved_count += 1
+                except Exception as e:
+                    logger.warning(f"Error saving word '{word}': {e}")
+
+            # Get total word count
+            total_words = await vocab_service.get_word_count(user)
+
+            # Delete processing message
+            await processing_msg.delete()
+
+            # Show success message
+            await message.answer(
+                f"✅ <b>Success!</b>\n\n"
+                f"Added <b>{saved_count}</b> words to your vocabulary!\n\n"
+                f"📊 Total words: {total_words}\n\n"
+                f"💡 Use /quiz to practice them!",
+                parse_mode="HTML"
+            )
+
+            # Clear state
+            await state.clear()
+
+            logger.info(f"User {message.from_user.id} saved {saved_count} words from OCR")
+
+    except Exception as e:
+        logger.error(f"Error saving OCR words: {e}")
+        await message.answer("❌ Sorry, couldn't save the words. Please try again.")
         await state.clear()

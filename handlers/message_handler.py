@@ -20,6 +20,7 @@ async def cmd_start(message: types.Message) -> None:
         f"🇩🇪 I'm your German vocabulary learning assistant!\n\n"
         f"<b>Available Commands:</b>\n"
         f"📝 /addword - Add a new German word\n"
+        f"📸 /addphoto - Add words from a photo\n"
         f"📚 /mywords - View your vocabulary\n"
         f"🎯 /quiz - Practice with a quiz\n"
         f"🗑️ /delete - Remove a word\n"
@@ -39,6 +40,10 @@ async def cmd_help(message: types.Message) -> None:
         "📝 <b>/addword</b>\n"
         "   Add a new German word to your vocabulary\n"
         "   Only the German word is needed - learn translation through quiz!\n\n"
+        "📸 <b>/addphoto</b>\n"
+        "   Add words from a photo or image\n"
+        "   Take a picture of your textbook, notes, or any German text\n"
+        "   Review and confirm extracted words before saving\n\n"
         "📚 <b>/mywords</b>\n"
         "   View all your saved words with statistics\n\n"
         "🎯 <b>/quiz</b>\n"
@@ -51,7 +56,8 @@ async def cmd_help(message: types.Message) -> None:
         "✨ Automatic article detection (der/die/das)\n"
         "🤖 AI-powered translation validation\n"
         "📊 Track your learning progress\n"
-        "💬 Instant feedback on your answers\n\n"
+        "💬 Instant feedback on your answers\n"
+        "🖼️ OCR text extraction from images\n\n"
         "<i>Need help? Contact support or check the docs!</i>"
     )
 
