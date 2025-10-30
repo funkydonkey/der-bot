@@ -23,8 +23,9 @@ class Settings(BaseSettings):
     # OpenAI
     openai_api_key: str
 
-    # MCP OCR Server (optional)
-    mcp_ocr_endpoint: str = "https://mcp-ocr.example.com"
+    # OCR Service (optional - OCR.space)
+    ocr_api_key: str = ""  # OCR.space API key (free tier available)
+    ocr_api_endpoint: str = "https://api.ocr.space/parse/image"
 
     # Database (defaults to SQLite for local dev, override for production)
     database_url: str = "sqlite+aiosqlite:///./telegram_bot.db"
