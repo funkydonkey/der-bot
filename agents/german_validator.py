@@ -185,12 +185,14 @@ IMPORTANT: Verbs NEVER have articles. Only nouns have articles (der/die/das)."""
             word_type = result.get("word_type", "other")
             detected_article = result.get("article")
 
-            # Only use article for nouns
+            # Force article to None for non-nouns (safety check)
             if word_type != "noun":
                 detected_article = None
+            elif detected_article == "null" or detected_article == "None":
+                detected_article = None
 
-            # If article was already in the input, use it
-            if article:
+            # If article was already in the input, use it (only for nouns)
+            if article and word_type == "noun":
                 detected_article = article
                 word_to_store = word
                 full_word = german_word
@@ -200,6 +202,10 @@ IMPORTANT: Verbs NEVER have articles. Only nouns have articles (der/die/das)."""
                     full_word = f"{detected_article} {word}"
                 else:
                     full_word = word
+
+            # Final safety: Double-check verbs don't have articles
+            if word_type in ["verb", "adjective", "adverb", "phrase", "other"]:
+                detected_article = None
 
             return {
                 "word_type": word_type,
@@ -297,13 +303,19 @@ IMPORTANT: Only nouns (like Hund, Haus, Katze) get articles. Verbs, adjectives, 
                     word_type = result.get("word_type", "other")
                     detected_article = result.get("article")
 
-                    # Only use article for nouns
-                    if word_type != "noun" or detected_article == "null":
+                    # Force article to None for non-nouns (safety check)
+                    if word_type != "noun":
+                        detected_article = None
+                    elif detected_article == "null" or detected_article == "None":
                         detected_article = None
 
-                    # If article was already in input, use it
-                    if article:
+                    # If article was already in input, use it (only for nouns)
+                    if article and word_type == "noun":
                         detected_article = article
+
+                    # Final safety: Double-check verbs don't have articles
+                    if word_type in ["verb", "adjective", "adverb", "phrase", "other"]:
+                        detected_article = None
 
                     word_info = {
                         "word": word_without_article or original_word,
