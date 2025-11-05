@@ -248,13 +248,16 @@ def _preprocess_image(image_data: bytes) -> bytes:
 def _extract_words_from_text(text: str) -> List[str]:
     """
     Extract valid German words from OCR text.
+    Filters out articles, pronouns, prepositions, and conjunctions.
 
     Args:
         text: Raw OCR text output
 
     Returns:
-        List of cleaned German words
+        List of cleaned German words (excluding articles/pronouns)
     """
+    from services.german_filters import should_filter_word
+
     # Split text into words
     raw_words = text.split()
 
@@ -265,8 +268,13 @@ def _extract_words_from_text(text: str) -> List[str]:
         # Clean word
         cleaned = _clean_word(word)
 
-        # Validate and add if unique
+        # Validate and filter out articles/pronouns
         if cleaned and _is_valid_german_word(cleaned):
+            # Filter out articles, pronouns, prepositions, conjunctions
+            if should_filter_word(cleaned):
+                logger.debug(f"Filtered out from OCR: {cleaned} (article/pronoun/preposition)")
+                continue
+
             word_lower = cleaned.lower()
             if word_lower not in seen:
                 seen.add(word_lower)

@@ -82,7 +82,12 @@ async def process_german_word(message: types.Message, state: FSMContext) -> None
             response = f"✨ <b>Word added!</b>\n\n"
             response += f"📖 <b>{word.full_german_word}</b>\n\n"
 
-            if article_info.get("article"):
+            # Show word type
+            word_type = article_info.get("word_type", "word")
+            response += f"📝 Type: {word_type}\n"
+
+            # Only show article for nouns
+            if word_type == "noun" and article_info.get("article"):
                 response += f"💡 Article: {article_info.get('article')}\n"
 
             response += f"\n🎯 Use /quiz to learn the translation!\n"

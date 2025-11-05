@@ -162,9 +162,12 @@ Return ONLY a JSON object with this format:
 
 Examples:
 - "Hund" → {{"word_type": "noun", "article": "der", "explanation": "masculine noun"}}
-- "laufen" → {{"word_type": "verb", "article": null, "explanation": "infinitive verb"}}
+- "arbeiten" → {{"word_type": "verb", "article": null, "explanation": "infinitive verb (to work)"}}
+- "laufen" → {{"word_type": "verb", "article": null, "explanation": "infinitive verb (to run)"}}
 - "schnell" → {{"word_type": "adjective", "article": null, "explanation": "adjective/adverb"}}
-- "sich kümmern um" → {{"word_type": "phrase", "article": null, "explanation": "reflexive verb phrase"}}"""
+- "sich kümmern um" → {{"word_type": "phrase", "article": null, "explanation": "reflexive verb phrase"}}
+
+IMPORTANT: Verbs NEVER have articles. Only nouns have articles (der/die/das)."""
 
             response = await self.client.chat.completions.create(
                 model=self.model,
@@ -262,9 +265,13 @@ Return ONLY a JSON array with this exact format:
 
 Rules:
 - Article should ONLY be provided for word_type="noun", otherwise null
+- Verbs NEVER have articles (arbeiten, laufen, sein, etc. → article: null)
+- Adjectives NEVER have articles (schnell, gut, schön, etc. → article: null)
 - Multi-word expressions are word_type="phrase"
 - Return results in the same order as input
-- Include all {len(batch)} words in the response"""
+- Include all {len(batch)} words in the response
+
+IMPORTANT: Only nouns (like Hund, Haus, Katze) get articles. Verbs, adjectives, and adverbs never get articles!"""
 
                 response = await self.client.chat.completions.create(
                     model=self.model,
