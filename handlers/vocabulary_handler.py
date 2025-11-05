@@ -734,8 +734,8 @@ async def process_bulk_review(message: types.Message, state: FSMContext) -> None
             )
             return
 
-        # Save words to database
-        processing_msg = await message.answer("💾 Saving words...")
+        # Save words to database using bulk operation
+        processing_msg = await message.answer("💾 Analyzing and saving words...")
 
         session_maker = get_session_maker()
         async with session_maker() as session:
@@ -749,16 +749,11 @@ async def process_bulk_review(message: types.Message, state: FSMContext) -> None
                 last_name=message.from_user.last_name
             )
 
-            # Add each word
-            saved_count = 0
-            skipped_count = 0
-            for word in final_words:
-                try:
-                    await vocab_service.add_word_without_translation(user, word)
-                    saved_count += 1
-                except Exception as e:
-                    logger.warning(f"Error saving word '{word}': {e}")
-                    skipped_count += 1
+            # Bulk add words (automatically detects types, articles, and filters pronouns/articles)
+            created_words, filtered_words = await vocab_service.bulk_add_words(user, final_words)
+
+            saved_count = len(created_words)
+            filtered_count = len(filtered_words)
 
             # Get total word count
             total_words = await vocab_service.get_word_count(user)
@@ -772,8 +767,8 @@ async def process_bulk_review(message: types.Message, state: FSMContext) -> None
                 f"Added <b>{saved_count}</b> words to your vocabulary!\n\n"
             )
 
-            if skipped_count > 0:
-                success_msg += f"⚠️ Skipped {skipped_count} words (duplicates or errors)\n\n"
+            if filtered_count > 0:
+                success_msg += f"🔍 Filtered out {filtered_count} articles/pronouns\n\n"
 
             success_msg += (
                 f"📊 Total words: {total_words}\n\n"
@@ -785,7 +780,7 @@ async def process_bulk_review(message: types.Message, state: FSMContext) -> None
             # Clear state
             await state.clear()
 
-            logger.info(f"User {message.from_user.id} saved {saved_count} words from bulk text (skipped {skipped_count})")
+            logger.info(f"User {message.from_user.id} saved {saved_count} words from bulk text (filtered {filtered_count})")
 
     except Exception as e:
         logger.error(f"Error saving bulk words: {e}")

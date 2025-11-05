@@ -23,14 +23,16 @@ class WordRepository:
         user_id: int,
         german_word: str,
         translation: str,
+        word_type: Optional[str] = None,
         article: Optional[str] = None,
         validated_by_agent: bool = False,
         validation_feedback: Optional[str] = None
     ) -> Word:
-        """Create a new word."""
+        """Create a new word with word type and article (article only for nouns)."""
         word = Word(
             user_id=user_id,
             german_word=german_word,
+            word_type=word_type,
             article=article,
             translation=translation,
             validated_by_agent=validated_by_agent,
@@ -40,8 +42,46 @@ class WordRepository:
         await self.session.commit()
         await self.session.refresh(word)
 
-        logger.info(f"Created word: {word.full_german_word} = {translation} for user {user_id}")
+        logger.info(f"Created word: {word.full_german_word} ({word_type}) = {translation} for user {user_id}")
         return word
+
+    async def bulk_create(
+        self,
+        user_id: int,
+        words_data: List[dict]
+    ) -> List[Word]:
+        """
+        Bulk create multiple words at once for efficiency.
+
+        Args:
+            user_id: User ID
+            words_data: List of dicts with keys: german_word, translation, word_type, article
+
+        Returns:
+            List of created Word objects
+        """
+        words = []
+        for data in words_data:
+            word = Word(
+                user_id=user_id,
+                german_word=data.get("german_word"),
+                word_type=data.get("word_type"),
+                article=data.get("article"),
+                translation=data.get("translation", "[pending]"),
+                validated_by_agent=data.get("validated_by_agent", False),
+                validation_feedback=data.get("validation_feedback")
+            )
+            words.append(word)
+            self.session.add(word)
+
+        await self.session.commit()
+
+        # Refresh all to get IDs
+        for word in words:
+            await self.session.refresh(word)
+
+        logger.info(f"Bulk created {len(words)} words for user {user_id}")
+        return words
 
     async def get_by_id(self, word_id: int) -> Optional[Word]:
         """Get word by ID."""

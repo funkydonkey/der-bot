@@ -1,13 +1,34 @@
-# Telegram Bot - Stage 1: Setup and Service Connection
+# Der-Bot - German Vocabulary Learning Telegram Bot
 
-A Telegram bot that integrates with OpenAI API, PostgreSQL database, and MCP OCR server. This is Stage 1 implementation focusing on infrastructure setup and service connectivity testing.
+An AI-powered Telegram bot for learning German vocabulary with intelligent word type detection, article assignment, and spaced repetition quizzes.
 
 ## Features
 
-- Responds to all incoming messages with "Message received"
+### Core Vocabulary Management
+- **Smart Word Addition** (`/addword`) - Add single German words with automatic article detection for nouns
+- **Bulk Import** (`/bulkadd`) - Paste vocabulary lists and extract German words automatically
+- **Image OCR** (`/addphoto`) - Extract words from photos of textbooks, notes, or flashcards
+- **Vocabulary Browser** (`/mywords`) - View all your words with learning statistics
+- **Word Deletion** (`/delete`) - Remove words from your vocabulary
+
+### Intelligent Features
+- **AI Word Type Detection** - Automatically identifies nouns, verbs, adjectives, phrases, etc.
+- **Article Management** - Articles (der/die/das) only assigned to nouns, not verbs or adjectives
+- **Phrase Recognition** - Multi-word expressions like "sich kümmern um" stored as single entries
+- **Smart Filtering** - Automatically filters out German articles, pronouns, and particles from bulk imports
+- **Lazy Translation Loading** - Learn translations during quiz practice, not during word addition
+
+### Quiz System
+- **Interactive Quizzes** (`/quiz`) - Practice with AI-powered answer validation
+- **Synonym Acceptance** - AI accepts close translations and synonyms
+- **Progress Tracking** - Track correct/incorrect attempts and success rates
+- **Encouraging Feedback** - AI provides helpful, supportive feedback on answers
+
+### Technical Highlights
 - Full service connectivity checks on startup
-- Comprehensive error logging
-- Ready for deployment on Render.com
+- Async-first architecture for high performance
+- Batch processing for efficient bulk operations (1-2 API calls for 50+ words)
+- Ready for deployment on Render.com with PostgreSQL
 
 ## Prerequisites
 

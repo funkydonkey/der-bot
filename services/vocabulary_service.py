@@ -87,34 +87,37 @@ class VocabularyService:
         """
         Add a new word without translation (lazy loading).
         Translation will be filled in during first quiz attempt.
+        Detects word type and adds article only for nouns.
 
         Args:
             user: User object
-            german_word: German word (with or without article)
+            german_word: German word or phrase (with or without article)
 
         Returns:
-            Tuple of (Word, article_info dict)
+            Tuple of (Word, word_info dict)
         """
-        # Check and add article if needed
-        article_info = await german_validator.check_article(german_word)
+        # Detect word type and article (for nouns only)
+        word_info = await german_validator.detect_word_type_and_article(german_word)
 
-        article = article_info.get("article")
-        word_without_article = article_info.get("word")
-        full_german_word = article_info.get("full_word")
+        article = word_info.get("article")
+        word_type = word_info.get("word_type", "other")
+        word_without_article = word_info.get("word")
+        full_german_word = word_info.get("full_word")
 
-        logger.info(f"Article check: {german_word} → {full_german_word} (article: {article})")
+        logger.info(f"Word analysis: {german_word} → {full_german_word} (type: {word_type}, article: {article})")
 
         # Save to database with placeholder translation
         word = await self.word_repo.create(
             user_id=user.id,
             german_word=word_without_article,
-            article=article,
+            word_type=word_type,
+            article=article if word_type == "noun" else None,  # Only store article for nouns
             translation="[pending]",  # Placeholder until first quiz
             validated_by_agent=False,
             validation_feedback=None
         )
 
-        return word, article_info
+        return word, word_info
 
     async def get_user_words(self, user: User, limit: Optional[int] = None) -> List[Word]:
         """Get all words for a user."""
@@ -183,3 +186,66 @@ class VocabularyService:
     async def delete_word_by_text(self, user: User, german_word: str) -> bool:
         """Delete a word by German word text."""
         return await self.word_repo.delete_word_by_text(user.id, german_word)
+
+    async def bulk_add_words(
+        self,
+        user: User,
+        german_words: List[str]
+    ) -> tuple[List[Word], List[str]]:
+        """
+        Bulk add multiple words without translation.
+        Detects word types and filters out articles/pronouns.
+        Uses batch processing for efficiency (1-2 API calls instead of N calls).
+
+        Args:
+            user: User object
+            german_words: List of German words/phrases
+
+        Returns:
+            Tuple of (List of created Words, List of filtered out words)
+        """
+        from services.german_filters import should_filter_word
+
+        # First pass: filter out articles and pronouns
+        words_to_process = []
+        filtered_words = []
+
+        for german_word in german_words:
+            if should_filter_word(german_word):
+                filtered_words.append(german_word)
+                logger.info(f"Filtered out: {german_word} (article/pronoun)")
+            else:
+                words_to_process.append(german_word)
+
+        if not words_to_process:
+            return [], filtered_words
+
+        # Batch detect word types and articles (efficient: 1-2 API calls for all words)
+        logger.info(f"Batch processing {len(words_to_process)} words for type detection")
+        word_infos = await german_validator.detect_batch_word_types(words_to_process)
+
+        # Prepare data for bulk database insert
+        words_data = []
+        for word_info in word_infos:
+            article = word_info.get("article")
+            word_type = word_info.get("word_type", "other")
+            word_without_article = word_info.get("word")
+
+            words_data.append({
+                "german_word": word_without_article,
+                "word_type": word_type,
+                "article": article if word_type == "noun" else None,
+                "translation": "[pending]",
+                "validated_by_agent": False,
+                "validation_feedback": None
+            })
+
+            logger.info(f"Prepared: {word_without_article} → type={word_type}, article={article}")
+
+        # Bulk create in database
+        if words_data:
+            created_words = await self.word_repo.bulk_create(user.id, words_data)
+        else:
+            created_words = []
+
+        return created_words, filtered_words

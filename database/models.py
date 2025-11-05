@@ -37,7 +37,8 @@ class Word(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     user_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id"), nullable=False, index=True)
     german_word: Mapped[str] = mapped_column(String(255), nullable=False)
-    article: Mapped[Optional[str]] = mapped_column(String(10), nullable=True)  # der, die, das
+    word_type: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)  # noun, verb, adjective, phrase, etc.
+    article: Mapped[Optional[str]] = mapped_column(String(10), nullable=True)  # der, die, das (only for nouns)
     translation: Mapped[str] = mapped_column(String(255), nullable=False)
 
     # Validation and feedback
@@ -65,8 +66,8 @@ class Word(Base):
 
     @property
     def full_german_word(self) -> str:
-        """Return German word with article if available."""
-        if self.article:
+        """Return German word with article if available (only for nouns)."""
+        if self.article and self.word_type == "noun":
             return f"{self.article} {self.german_word}"
         return self.german_word
 

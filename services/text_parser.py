@@ -3,6 +3,8 @@ import logging
 import re
 from typing import List, Tuple
 
+from services.german_filters import should_filter_word, is_phrase
+
 logger = logging.getLogger(__name__)
 
 
@@ -51,6 +53,11 @@ class GermanTextParser:
             german_word = self._extract_german_from_line(line)
 
             if german_word:
+                # Filter out articles and pronouns
+                if should_filter_word(german_word):
+                    logger.debug(f"Line {line_num}: '{line}' → '{german_word}' → FILTERED (article/pronoun)")
+                    continue
+
                 # Deduplicate (case-insensitive)
                 word_lower = german_word.lower()
                 if word_lower not in seen:
@@ -108,7 +115,8 @@ class GermanTextParser:
 
     def _clean_german_word(self, text: str) -> str:
         """
-        Clean and format extracted German word.
+        Clean and format extracted German word/phrase.
+        Preserves multi-word phrases like "sich kümmern um" or "Anfang Oktober".
 
         Args:
             text: Raw extracted text
@@ -147,18 +155,34 @@ class GermanTextParser:
                 if first_word.endswith(('en', 'eln', 'ern', 'n')):
                     words = [first_word]
 
-        # Keep prepositions and reflexive pronouns with the main word
-        # Example: "sich entwickeln" or "an teilnehmen"
+        # Keep prepositions and reflexive pronouns with the main word to preserve phrases
+        # Example: "sich entwickeln", "an teilnehmen", "mit jemandem sprechen"
         cleaned_words = []
-        for word in words:
+        for i, word in enumerate(words):
             word_clean = word.strip('.,;:!?"\'()[]{}')
-            if word_clean:
-                # Keep articles, reflexive pronouns, and actual content words
-                if (word_clean.lower() in self.GERMAN_PARTICLES or
-                    word_clean[0].isupper() or
-                    word_clean.endswith(('en', 'eln', 'ern', 'n')) or
-                    len(word_clean) > 3):
+            if not word_clean:
+                continue
+
+            # Always keep reflexive pronoun "sich" in phrases
+            if word_clean.lower() == "sich":
+                cleaned_words.append(word_clean)
+                continue
+
+            # Keep prepositions if they're part of a multi-word expression
+            # (i.e., not at the beginning and followed by more words)
+            if word_clean.lower() in self.GERMAN_PARTICLES:
+                if i > 0 and i < len(words) - 1:  # Middle of phrase
                     cleaned_words.append(word_clean)
+                elif i == 0 and len(words) > 1:  # Beginning with more words following
+                    # Only keep if it's part of a separable verb (e.g., "an nehmen")
+                    cleaned_words.append(word_clean)
+                continue
+
+            # Keep content words (nouns, verbs, adjectives)
+            if (word_clean[0].isupper() or  # Nouns
+                word_clean.endswith(('en', 'eln', 'ern', 'n')) or  # Verbs
+                len(word_clean) > 3):  # Adjectives/other content words
+                cleaned_words.append(word_clean)
 
         # Join and remove extra whitespace
         text = ' '.join(cleaned_words)
