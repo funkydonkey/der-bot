@@ -57,6 +57,19 @@ DATABASE_URL=sqlite+aiosqlite:///./telegram_bot.db
 DATABASE_URL=postgresql+asyncpg://user:password@host:5432/dbname
 ```
 
+### Database Migrations
+```bash
+# Run migration to add word_type column (required for new features)
+python migrate_add_word_type.py
+
+# For production: See MIGRATION_INSTRUCTIONS.md for detailed steps
+# Quick option: Run SQL directly on Render.com:
+#   ALTER TABLE words ADD COLUMN word_type VARCHAR(50);
+#   UPDATE words SET word_type = 'other' WHERE word_type IS NULL;
+```
+
+**IMPORTANT**: After pulling code with database schema changes, you must run migrations before starting the bot. The bot will fail with "column does not exist" errors if migrations are missing.
+
 ## Architecture Overview
 
 ### Layered Design
@@ -300,3 +313,111 @@ Run `test_services.py` to verify:
 | OpenAI for articles | Accurate grammatical gender | API costs (~$0.01 per word) |
 | OCR as external service | No ML infrastructure needed | Third-party dependency |
 | MemoryStorage FSM | Zero external dependencies | Not suitable for clustering |
+
+## Common Issues & Troubleshooting
+
+### "column 'word_type' does not exist" Error
+**Symptom**: Bot crashes when adding words with database error about missing column.
+
+**Cause**: Database schema is outdated. The `word_type` column was added in recent updates but your database doesn't have it yet.
+
+**Solution**: Run database migration:
+```bash
+# Local (SQLite)
+python migrate_add_word_type.py
+
+# Production (PostgreSQL on Render.com)
+# Option 1: Run SQL directly (fastest):
+ALTER TABLE words ADD COLUMN word_type VARCHAR(50);
+UPDATE words SET word_type = 'other' WHERE word_type IS NULL;
+
+# Option 2: See MIGRATION_INSTRUCTIONS.md for detailed steps
+```
+
+After migration, **restart the bot** for changes to take effect.
+
+### Verbs Getting Articles
+**Symptom**: Bot assigns articles like "das" to verbs like "arbeiten" or "machen".
+
+**Cause**: Code changes not loaded into memory (bot still running old code).
+
+**Solution**:
+1. Restart the bot process (Ctrl+C and `python main.py` or redeploy on Render)
+2. Verify you have the latest code with triple safety checks in `agents/german_validator.py`
+
+**Prevention**: Code is loaded once at startup. Always restart after git pull.
+
+### OCR Shows Articles/Pronouns
+**Symptom**: OCR results include "der", "die", "das", "ich", "du", etc.
+
+**Cause**: Bot process running old code without filtering.
+
+**Solution**: Restart the bot. The filtering is in `services/ocr_service.py::_extract_words_from_text()`.
+
+**Verification**: Check logs for "Filtered out from OCR" debug messages.
+
+### OpenAI Rate Limits
+**Symptom**: Slow responses or "rate limit exceeded" errors during bulk operations.
+
+**Solution**:
+- Use batch processing (already implemented in `bulk_add_words()`)
+- For 50+ words: Processing happens in batches of 30
+- Reduce batch size if needed: modify `batch_size` parameter in `detect_batch_word_types()`
+
+### Database Connection Fails on Startup
+**Symptom**: Bot exits with "Database connection failed" error.
+
+**Common causes**:
+1. **Wrong DATABASE_URL format**: Must use `postgresql+asyncpg://` for PostgreSQL or `sqlite+aiosqlite:///` for SQLite
+2. **Missing dependencies**: Run `pip install -r requirements.txt`
+3. **Database not accessible**: Check firewall, credentials, or Render.com database status
+
+### Code Changes Not Taking Effect
+**Symptom**: Made code changes but bot behavior unchanged.
+
+**Root cause**: Python loads code into memory at startup. Running bot process has old code.
+
+**Solution**: **Always restart the bot after code changes**:
+```bash
+# Local: Ctrl+C, then
+python main.py
+
+# Render.com: Click "Restart Service" or trigger new deployment
+```
+
+### FSM State Confusion
+**Symptom**: Bot doesn't respond correctly to multi-turn conversations (addword, quiz, bulkadd).
+
+**Cause**: FSM state stored in memory gets lost on restart or bot confused by unexpected input.
+
+**Solution**:
+- Send `/start` to reset state
+- FSM states are lost on bot restart (expected behavior with MemoryStorage)
+- For production with multiple instances, consider Redis-backed FSM storage
+
+## Development Best Practices
+
+### Before Committing
+1. Run migration scripts if you modified database models
+2. Test locally with SQLite first
+3. Verify all handlers use new service methods
+4. Check logs for any deprecation warnings
+
+### After Pulling Updates
+1. Check for new migration scripts (e.g., `migrate_*.py`)
+2. Run migrations on your database
+3. Restart bot process
+4. Test core flows: /addword, /quiz, /bulkadd, /addphoto
+
+### When Adding New Fields
+1. Add field to `database/models.py`
+2. Create migration script (see `migrate_add_word_type.py` as template)
+3. Update repositories if needed
+4. Update services to use new field
+5. Document in CLAUDE.md
+
+### When Modifying AI Prompts
+- Test with real examples (nouns, verbs, adjectives, phrases)
+- Add explicit rules and examples for edge cases
+- Include "IMPORTANT" warnings for critical constraints
+- Implement safety checks in code (don't rely only on AI)
